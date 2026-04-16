@@ -1,5 +1,6 @@
-from pydantic import BaseModel, Field
 from typing import List, Optional
+
+from pydantic import BaseModel, Field
 
 
 class ChatMessage(BaseModel):
@@ -13,15 +14,12 @@ class ChatRequest(BaseModel):
     company_id: Optional[str] = Field(default=None, examples=["startup-demo-001"])
 
 
-class SourceItem(BaseModel):
-    title: str
-    snippet: str
-
-
 class ChatResponse(BaseModel):
     answer: str
-    sources: List[SourceItem] = Field(default_factory=list)
     needs_human: bool = False
+    confidence: str = "low"
+    retrieval_count: int = 0
+    response_time_ms: int = 0
 
 
 class UploadResponse(BaseModel):
@@ -30,6 +28,15 @@ class UploadResponse(BaseModel):
     message: str
     document_id: Optional[str] = None
     chunks_created: Optional[int] = None
+    uploaded_at: Optional[str] = None
+    file_size_bytes: Optional[int] = None
+
+
+class DeleteDocumentResponse(BaseModel):
+    document_id: str
+    filename: str
+    status: str
+    message: str
 
 
 class RetrieveRequest(BaseModel):
@@ -46,13 +53,26 @@ class RetrievedChunk(BaseModel):
 class RetrieveResponse(BaseModel):
     query: str
     results: List[RetrievedChunk] = Field(default_factory=list)
+    total_results: int = 0
 
 
 class DocumentRecord(BaseModel):
     document_id: str
     filename: str
     chunks_created: int
+    created_at: str
+    file_size_bytes: int
+    status: str = "ready"
 
 
 class DocumentListResponse(BaseModel):
     documents: List[DocumentRecord] = Field(default_factory=list)
+
+
+class HealthResponse(BaseModel):
+    status: str
+    environment: str
+    version: str
+    llm_configured: bool
+    model: str
+    documents_indexed: int

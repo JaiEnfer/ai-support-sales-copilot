@@ -1,1 +1,11 @@
-[]
+[
+  {
+    "document_id": "813ccc86-effd-4148-bb90-8a5805c2a092",
+    "filename": "Sample-Company-Document.pdf",
+    "stored_filename": "813ccc86-effd-4148-bb90-8a5805c2a092_Sample-Company-Document.pdf",
+    "chunks_created": 4,
+    "created_at": "2026-04-16T20:24:23.160318+00:00",
+    "file_size_bytes": 252949,
+    "status": "ready"
+  }
+]

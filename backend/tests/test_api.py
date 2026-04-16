@@ -28,7 +28,6 @@ def test_chat_without_documents():
     assert response.status_code == 200
     data = response.json()
     assert "answer" in data
-    assert "sources" in data
     assert "needs_human" in data
 
 
@@ -58,3 +57,18 @@ def test_list_documents():
     assert response.status_code == 200
     data = response.json()
     assert "documents" in data
+
+def test_chat_with_conversation_history():
+    payload = {
+        "message": "Can you clarify that?",
+        "conversation_history": [
+            {"role": "user", "content": "What does your pricing include?"},
+            {"role": "assistant", "content": "It includes setup and analytics."}
+        ],
+        "company_id": "startup-demo-001"
+    }
+    response = client.post("/api/chat", json=payload)
+    assert response.status_code == 200
+    data = response.json()
+    assert "answer" in data
+    assert "needs_human" in data
