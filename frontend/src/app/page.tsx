@@ -2,28 +2,51 @@
 
 import { useState } from "react";
 
+type SourceItem = {
+  title: string;
+  snippet: string;
+};
+
+type ChatResponse = {
+  answer: string;
+  sources: SourceItem[];
+  needs_human: boolean;
+};
+
 export default function Home() {
   const [message, setMessage] = useState("");
-  const [backendReply, setBackendReply] = useState("No message yet.");
+  const [chatReply, setChatReply] = useState<ChatResponse | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const checkBackend = async () => {
+  const sendMessage = async () => {
+    if (!message.trim()) return;
+
     try {
       setLoading(true);
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/demo`);
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/chat`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          message,
+          conversation_history: [],
+          company_id: "startup-demo-001",
+        }),
+      });
+
       const data = await response.json();
-      setBackendReply(data.reply);
+      setChatReply(data);
+      setMessage("");
     } catch (error) {
-      setBackendReply("Could not connect to backend.");
+      setChatReply({
+        answer: "Could not connect to backend.",
+        sources: [],
+        needs_human: true,
+      });
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleSend = () => {
-    if (!message.trim()) return;
-    setBackendReply(`Demo user message captured: ${message}`);
-    setMessage("");
   };
 
   return (
@@ -37,43 +60,52 @@ export default function Home() {
           Startup-focused AI chatbot for support and lead conversion.
         </p>
 
-        <div className="bg-white rounded-2xl shadow p-6 mb-6">
-          <h2 className="text-2xl font-semibold mb-4">Backend Connection Test</h2>
-
-          <button
-            onClick={checkBackend}
-            className="px-4 py-2 rounded-xl bg-black text-white hover:opacity-90"
-          >
-            {loading ? "Checking..." : "Check Backend"}
-          </button>
-
-          <p className="mt-4 text-base">
-            <strong>Backend reply:</strong> {backendReply}
-          </p>
-        </div>
-
         <div className="bg-white rounded-2xl shadow p-6">
-          <h2 className="text-2xl font-semibold mb-4">Chat UI Starter</h2>
+          <h2 className="text-2xl font-semibold mb-4">Chat Demo</h2>
 
           <div className="flex gap-3">
             <input
               type="text"
               value={message}
               onChange={(e) => setMessage(e.target.value)}
-              placeholder="Type a customer question..."
+              placeholder="Ask a question like: What does your pricing include?"
               className="flex-1 border rounded-xl px-4 py-3 outline-none"
             />
             <button
-              onClick={handleSend}
+              onClick={sendMessage}
               className="px-4 py-3 rounded-xl bg-black text-white hover:opacity-90"
             >
-              Send
+              {loading ? "Sending..." : "Send"}
             </button>
           </div>
 
-          <p className="mt-4 text-sm text-gray-600">
-            This is the UI base. Later, this input will send queries to the RAG chatbot backend.
-          </p>
+          {chatReply && (
+            <div className="mt-6 border-t pt-4">
+              <p className="mb-3">
+                <strong>Answer:</strong> {chatReply.answer}
+              </p>
+
+              <p className="mb-3">
+                <strong>Needs human:</strong> {chatReply.needs_human ? "Yes" : "No"}
+              </p>
+
+              <div>
+                <strong>Sources:</strong>
+                {chatReply.sources.length === 0 ? (
+                  <p className="text-sm text-gray-600 mt-2">No sources available.</p>
+                ) : (
+                  <ul className="mt-2 space-y-2">
+                    {chatReply.sources.map((source, index) => (
+                      <li key={index} className="border rounded-xl p-3 bg-gray-50">
+                        <p className="font-medium">{source.title}</p>
+                        <p className="text-sm text-gray-600">{source.snippet}</p>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </main>

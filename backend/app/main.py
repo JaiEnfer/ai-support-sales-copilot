@@ -1,9 +1,13 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from backend.app.api.health import router as health_router
+from backend.app.api.chat import router as chat_router
+from backend.app.api.documents import router as documents_router
+
 app = FastAPI(
     title="AI Support + Sales Copilot API",
-    version="0.1.0"
+    version="0.2.0"
 )
 
 origins = [
@@ -19,22 +23,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(health_router)
+app.include_router(chat_router)
+app.include_router(documents_router)
+
 
 @app.get("/")
 def read_root():
     return {
         "message": "Backend is running",
         "product": "AI Support + Sales Copilot"
-    }
-
-
-@app.get("/health")
-def health_check():
-    return {"status": "ok"}
-
-
-@app.get("/api/demo")
-def demo_message():
-    return {
-        "reply": "Hello from the backend. Your AI Support + Sales Copilot API is connected."
     }

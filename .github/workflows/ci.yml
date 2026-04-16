@@ -24,9 +24,9 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r backend/requirements.txt
 
-      - name: Run backend import check
+      - name: Run backend tests
         run: |
-          python -c "from backend.app.main import app; print('FastAPI app imported successfully')"
+          pytest
 
   frontend-build:
     runs-on: ubuntu-latest
