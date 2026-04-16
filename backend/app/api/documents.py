@@ -4,10 +4,18 @@ from uuid import uuid4
 from fastapi import APIRouter, UploadFile, File, HTTPException
 
 from backend.app.core.config import UPLOAD_DIR
-from backend.app.models.schemas import UploadResponse, RetrieveRequest, RetrieveResponse, RetrievedChunk
+from backend.app.models.schemas import (
+    UploadResponse,
+    RetrieveRequest,
+    RetrieveResponse,
+    RetrievedChunk,
+    DocumentListResponse,
+    DocumentRecord,
+)
 from backend.app.services.document_parser import extract_text_from_pdf
 from backend.app.services.chunking_service import split_text_into_chunks
 from backend.app.services.vector_store import add_document_chunks, search_chunks
+from backend.app.services.document_registry import add_document_record, load_documents
 
 router = APIRouter(prefix="/api/documents", tags=["documents"])
 
@@ -40,6 +48,14 @@ async def upload_document(file: UploadFile = File(...)):
         chunks=chunks
     )
 
+    add_document_record(
+        {
+            "document_id": document_id,
+            "filename": file.filename,
+            "chunks_created": chunks_created,
+        }
+    )
+
     return UploadResponse(
         filename=file.filename,
         status="processed",
@@ -70,3 +86,10 @@ def retrieve_chunks(request: RetrieveRequest):
         query=request.query,
         results=results
     )
+
+
+@router.get("", response_model=DocumentListResponse)
+def list_documents():
+    raw_documents = load_documents()
+    documents = [DocumentRecord(**item) for item in raw_documents]
+    return DocumentListResponse(documents=documents)

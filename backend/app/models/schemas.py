@@ -46,3 +46,13 @@ class RetrievedChunk(BaseModel):
 class RetrieveResponse(BaseModel):
     query: str
     results: List[RetrievedChunk] = Field(default_factory=list)
+
+
+class DocumentRecord(BaseModel):
+    document_id: str
+    filename: str
+    chunks_created: int
+
+
+class DocumentListResponse(BaseModel):
+    documents: List[DocumentRecord] = Field(default_factory=list)

@@ -51,3 +51,10 @@ def test_retrieve_request_validation():
     data = response.json()
     assert data["query"] == "pricing"
     assert "results" in data
+
+
+def test_list_documents():
+    response = client.get("/api/documents")
+    assert response.status_code == 200
+    data = response.json()
+    assert "documents" in data
