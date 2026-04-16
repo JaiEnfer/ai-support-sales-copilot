@@ -28,3 +28,21 @@ class UploadResponse(BaseModel):
     filename: str
     status: str
     message: str
+    document_id: Optional[str] = None
+    chunks_created: Optional[int] = None
+
+
+class RetrieveRequest(BaseModel):
+    query: str = Field(..., min_length=1)
+    top_k: int = Field(default=4, ge=1, le=10)
+
+
+class RetrievedChunk(BaseModel):
+    content: str
+    filename: str
+    chunk_index: int
+
+
+class RetrieveResponse(BaseModel):
+    query: str
+    results: List[RetrievedChunk] = Field(default_factory=list)

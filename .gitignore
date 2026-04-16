@@ -23,3 +23,7 @@ build/
 
 # Logs
 *.log
+
+
+backend/data/uploads/
+backend/data/chroma/

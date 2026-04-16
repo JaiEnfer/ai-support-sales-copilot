@@ -1,38 +1,41 @@
 from backend.app.models.schemas import ChatRequest, ChatResponse, SourceItem
+from backend.app.services.vector_store import search_chunks
 
 
 def generate_demo_chat_response(request: ChatRequest) -> ChatResponse:
-    user_message = request.message.strip().lower()
+    results = search_chunks(request.message, top_k=3)
 
-    if "price" in user_message or "pricing" in user_message:
-        return ChatResponse(
-            answer="Our startup plan includes chatbot setup, website integration, and basic analytics.",
-            sources=[
-                SourceItem(
-                    title="Pricing Overview",
-                    snippet="Startup plan includes setup, integration, and analytics."
-                )
-            ],
-            needs_human=False
-        )
+    documents = results.get("documents", [[]])[0]
+    metadatas = results.get("metadatas", [[]])[0]
 
-    if "human" in user_message or "agent" in user_message:
+    if not documents:
         return ChatResponse(
-            answer="I can connect you to a human teammate for a detailed follow-up.",
+            answer=(
+                "I could not find relevant information in the uploaded knowledge base yet. "
+                "Please upload documents or ask a human teammate."
+            ),
             sources=[],
             needs_human=True
         )
 
-    return ChatResponse(
-        answer=(
-            "Thanks for your question. This is the demo chat response layer. "
-            "In the next steps, this will be connected to document retrieval and RAG."
-        ),
-        sources=[
+    sources = []
+    for doc, metadata in zip(documents, metadatas):
+        snippet = doc[:220].replace("\n", " ").strip()
+        sources.append(
             SourceItem(
-                title="Demo Knowledge Base",
-                snippet="This reply is currently generated from the demo service layer."
+                title=f"{metadata['filename']} (chunk {metadata['chunk_index']})",
+                snippet=snippet
             )
-        ],
+        )
+
+    answer = (
+        "I found relevant information in the uploaded documents. "
+        "Right now I am returning retrieval-grounded snippets. "
+        "In the next step, we will turn these retrieved chunks into a polished RAG answer."
+    )
+
+    return ChatResponse(
+        answer=answer,
+        sources=sources,
         needs_human=False
     )
