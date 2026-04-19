@@ -5,7 +5,7 @@
 ![Next.js](https://img.shields.io/badge/Next.js-16-000000?logo=nextdotjs&logoColor=white)
 ![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)
 ![Pytest](https://img.shields.io/badge/Tests-Pytest-0A9EDC?logo=pytest&logoColor=white)
-![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-CI_Ready-2088FF?logo=githubactions&logoColor=white)
+[![CI/CD Pipeline](https://github.com/JaiEnfer/ai-support-sales-copilot/actions/workflows/ci.yml/badge.svg)](https://github.com/JaiEnfer/ai-support-sales-copilot/actions/workflows/ci.yml)
 
 A production-oriented AI chatbot for support and sales teams. The project combines a FastAPI backend, a Next.js frontend, document ingestion, retrieval, grounded responses, and operator tooling for testing and admin workflows.
 
