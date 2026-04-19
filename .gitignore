@@ -27,3 +27,6 @@ build/
 
 backend/data/uploads/
 backend/data/chroma/
+backend/data/_demo_runtime/
+backend/data/fallback_chunks.json
+backend/tests/.tmp_sample_chatbot/
