@@ -20,20 +20,21 @@ Support and sales teams need answers that are fast, consistent, and grounded in 
 
 ## Core Capabilities
 
-- Grounded chat responses from indexed company documents
+- grounded chat responses from indexed company documents
 - PDF ingestion pipeline with filename sanitization and upload size limits
-- Retrieval endpoint for inspecting what the system can find
-- Health endpoint that exposes runtime and indexing status
-- Request tracing with `X-Request-ID` for easier debugging across logs and clients
-- Optional API-key protection for chat and admin/document endpoints
-- Trusted-host and production docs controls for safer public deployment
-- Human-escalation behavior when confidence is low
+- retrieval endpoint for inspecting what the system can find
+- health endpoint that exposes runtime and indexing status
+- request tracing with `X-Request-ID` for easier debugging across logs and clients
+- optional API-key protection for chat and admin/document endpoints
+- trusted-host and production docs controls for safer public deployment
+- human-escalation behavior when confidence is low
 - Groq-compatible LLM integration with a local extractive fallback
 - Chroma-backed retrieval with a lightweight keyword fallback for local demos and restricted environments
 
 ## Architecture
 
 ### Backend
+
 - Framework: FastAPI
 - Entry point: `backend/app/main.py`
 - Chat route: `POST /api/chat`
@@ -41,11 +42,13 @@ Support and sales teams need answers that are fast, consistent, and grounded in 
 - Health route: `GET /api/health`
 
 ### Frontend
+
 - Framework: Next.js 16 with React 19
 - App directory: `frontend/src/app`
 - Includes a customer chat experience, an admin area, and an embeddable website widget
 
 ### Retrieval Layer
+
 - Primary store: ChromaDB
 - Embeddings: `sentence-transformers`
 - Local resilience: keyword-based fallback index for smoke tests and constrained environments
@@ -66,6 +69,7 @@ Support and sales teams need answers that are fast, consistent, and grounded in 
 |-- frontend/
 |   `-- src/app/
 |-- .github/workflows/ci.yml
+|-- DEPLOYMENT.md
 |-- docker-compose.yml
 `-- README.md
 ```
@@ -94,15 +98,20 @@ Create `backend/.env` from `backend/.env.example` if you want to override defaul
 APP_ENV=development
 APP_VERSION=1.0.0
 ENABLE_API_DOCS=true
+DATA_DIR=backend/data
 GROQ_API_KEY=
 GROQ_MODEL=llama-3.1-8b-instant
 DEFAULT_COMPANY_ID=startup-demo-001
+DEFAULT_ANSWER_MODE=sales
 ADMIN_API_KEY=change-me-admin-key
 CHAT_API_KEY=
 REQUIRE_COMPANY_ID=true
 MAX_CHAT_HISTORY_MESSAGES=12
 MAX_CHAT_MESSAGE_LENGTH=4000
 MAX_UPLOAD_SIZE_BYTES=10485760
+WEBSITE_SCRAPE_MAX_PAGES=6
+WEBSITE_SCRAPE_TIMEOUT_SECONDS=10
+WEBSITE_SCRAPE_USER_AGENT=AI-Support-Sales-Copilot/1.0
 TRUSTED_HOSTS=["localhost","127.0.0.1","testserver"]
 ALLOWED_ORIGINS=["http://localhost:3000","http://127.0.0.1:3000"]
 ```
@@ -142,28 +151,32 @@ docker compose up --build
 
 The compose service now uses a built image, restart policy, environment file, and a liveness healthcheck. The frontend is still intended to be run locally with `npm run dev`.
 
+## Deployment
+
+Deployment instructions live in [DEPLOYMENT.md](./DEPLOYMENT.md).
+
 ## Multi-Company Product Flow
 
-This project now supports a basic white-label model:
+This project supports a basic white-label model:
 
 - each company uses a unique `company_id`
 - uploads, retrieval, and chat responses are scoped to that company
 - the admin dashboard can be pointed at a specific tenant/company workspace
 - the website widget can be embedded on any client site and tied to that company
-- the admin dashboard can also scrape a client website and index a few same-domain pages for demos
-- scraped websites now generate a structured summary layer before raw page text is indexed, improving demo answer quality
+- the admin dashboard can scrape a client website and index a few same-domain pages for demos
+- scraped websites generate a structured summary layer before raw page text is indexed, improving demo answer quality
 - each company can use its own chatbot tone: `sales`, `support`, or `portfolio`
 
-### Tenant onboarding
+### Tenant Onboarding
 
-1. Pick a `company_id` such as `acme-dental`
-2. Open the admin dashboard and set that company ID
-3. Upload that company’s PDFs and knowledge files
-4. Embed the widget script on that company’s website
+1. Pick a `company_id` such as `acme-dental`.
+2. Open the admin dashboard and set that company ID.
+3. Upload that company's PDFs and knowledge files.
+4. Embed the widget script on that company's website.
 
 For faster demos, you can also paste a client website URL into the admin dashboard and let the app ingest the homepage plus a few linked pages.
 
-### Website embed snippet
+### Website Embed Snippet
 
 Serve the frontend publicly, then place this on a client website:
 
@@ -180,7 +193,7 @@ Serve the frontend publicly, then place this on a client website:
 
 The script injects a floating chat button and loads an iframe-backed assistant from `/embed`.
 
-### Admin tenant workflow
+### Admin Tenant Workflow
 
 - use `X-Company-ID` or the admin page tenant field to scope uploads
 - use `ADMIN_API_KEY` to protect document-management endpoints
@@ -188,9 +201,9 @@ The script injects a floating chat button and loads an iframe-backed assistant f
 
 For real production deployments, replace shared chat keys with a gateway or token-based auth layer.
 
-## Sample Document and Human-Style Demo
+## Sample Document And Human-Style Demo
 
-The repo now includes a realistic sample knowledge-base document:
+The repo includes a realistic sample knowledge-base document:
 
 - `backend/data/sample-company-handbook.md`
 
@@ -208,9 +221,9 @@ The demo script:
 
 Example topics covered in the scripted conversation:
 
-- Growth-plan onboarding timeline
+- growth-plan onboarding timeline
 - Salesforce and Slack integrations
-- Workflow overage policy
+- workflow overage policy
 - EU data residency availability
 
 ## Testing

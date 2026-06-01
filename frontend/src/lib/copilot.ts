@@ -4,6 +4,8 @@ export const DEFAULT_COMPANY_ID =
 export const CHAT_API_KEY = process.env.NEXT_PUBLIC_CHAT_API_KEY || "";
 export const ADMIN_API_KEY = process.env.NEXT_PUBLIC_ADMIN_API_KEY || "";
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "";
+export const SHOW_ADMIN_LINK =
+  process.env.NEXT_PUBLIC_SHOW_ADMIN_LINK === "true";
 
 export function buildApiUrl(path: string) {
   return API_BASE_URL ? `${API_BASE_URL}${path}` : path;

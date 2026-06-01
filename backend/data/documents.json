@@ -1,1 +1,12 @@
-[]
+[
+  {
+    "document_id": "4f2afc0b-a1af-48f5-917f-30b7cd64ca12",
+    "company_id": "startup-demo-001",
+    "filename": "aafa2d12-d796-4e4c-ba1f-14fe840d058d_cv_9.pdf",
+    "stored_filename": "4f2afc0b-a1af-48f5-917f-30b7cd64ca12_aafa2d12-d796-4e4c-ba1f-14fe840d058d_cv_9.pdf",
+    "chunks_created": 10,
+    "created_at": "2026-06-01T18:42:42.112480+00:00",
+    "file_size_bytes": 7730,
+    "status": "ready"
+  }
+]

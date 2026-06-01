@@ -1,3 +1,5 @@
+"""Application configuration and storage-path setup for all runtimes."""
+
 from functools import lru_cache
 from pathlib import Path
 
@@ -5,9 +7,7 @@ from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
-DATA_DIR = BASE_DIR / "data"
-UPLOAD_DIR = DATA_DIR / "uploads"
-CHROMA_DIR = DATA_DIR / "chroma"
+DEFAULT_DATA_DIR = BASE_DIR / "data"
 
 
 class Settings(BaseSettings):
@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     app_version: str = "1.0.0"
     app_env: str = "development"
     enable_api_docs: bool = True
+    data_dir: Path = DEFAULT_DATA_DIR
     groq_api_key: str | None = None
     groq_model: str = "llama-3.1-8b-instant"
     default_company_id: str = "startup-demo-001"
@@ -49,6 +50,18 @@ class Settings(BaseSettings):
             return ["localhost", "127.0.0.1", "testserver"]
         return value
 
+    @field_validator("data_dir", mode="before")
+    @classmethod
+    def normalize_data_dir(cls, value):
+        """Allow relative paths locally and absolute mount paths in production."""
+        if value in (None, ""):
+            return DEFAULT_DATA_DIR
+
+        data_dir = Path(value)
+        if not data_dir.is_absolute():
+            data_dir = (BASE_DIR / data_dir).resolve()
+        return data_dir
+
     @property
     def is_production(self) -> bool:
         return self.app_env.lower() == "production"
@@ -62,6 +75,9 @@ def get_settings() -> Settings:
 settings = get_settings()
 GROQ_API_KEY = settings.groq_api_key
 GROQ_MODEL = settings.groq_model
+DATA_DIR = settings.data_dir
+UPLOAD_DIR = DATA_DIR / "uploads"
+CHROMA_DIR = DATA_DIR / "chroma"
 
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 CHROMA_DIR.mkdir(parents=True, exist_ok=True)
