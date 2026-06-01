@@ -1,12 +1,21 @@
-version: "3.9"
-
 services:
   backend:
-    image: python:3.13-slim
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: ai_copilot_backend
-    working_dir: /app
+    working_dir: /workspace
+    restart: unless-stopped
     volumes:
-      - ./backend:/app
-    command: sh -c "pip install -r requirements.txt && uvicorn app.main:app --host 0.0.0.0 --port 8000"
+      - .:/workspace
+    env_file:
+      - backend/.env
+    command: uvicorn backend.app.main:app --host 0.0.0.0 --port 8000
     ports:
       - "8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "from urllib.request import urlopen; urlopen('http://127.0.0.1:8000/api/health/live').read()"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s

@@ -1,0 +1,16 @@
+[
+  {
+    "company_id": "startup-demo-001",
+    "display_name": "Startup Demo 001",
+    "answer_mode": "portfolio",
+    "chatbot_title": "AI Assistant",
+    "chatbot_subtitle": "Ask anything about this business."
+  },
+  {
+    "company_id": "startup-demo-002",
+    "display_name": "Startup Demo 002",
+    "answer_mode": "portfolio",
+    "chatbot_title": "AI Assistant",
+    "chatbot_subtitle": "Ask anything about this business."
+  }
+]

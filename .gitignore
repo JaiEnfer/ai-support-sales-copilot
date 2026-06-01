@@ -3,6 +3,8 @@
 __pycache__/
 *.pyc
 .pytest_cache/
+backend/.pytest_tmp/
+backend/pytest-cache-files-*/
 
 # Node
 node_modules/
@@ -30,3 +32,8 @@ backend/data/chroma/
 backend/data/_demo_runtime/
 backend/data/fallback_chunks.json
 backend/tests/.tmp_sample_chatbot/
+backend/tests/.tmp_registry_resilience/
+docs/backend.log
+docs/chrome-profile/
+docs/edge-headless-profile/
+docs/edge-headless-profile-admin/

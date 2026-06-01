@@ -45,6 +45,7 @@ def run_demo() -> None:
     chunks = _build_demo_chunks(sample_text)
     add_document_chunks(
         document_id="brightpath-demo-doc",
+        company_id="brightpath-demo",
         filename=SAMPLE_DOC_PATH.name,
         chunks=chunks,
     )

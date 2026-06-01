@@ -2,10 +2,18 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import {
+  ADMIN_API_KEY,
+  buildApiUrl,
+  buildRequestHeaders,
+  CHAT_API_KEY,
+  DEFAULT_COMPANY_ID,
+} from "@/lib/copilot";
 
 type ChatResponse = {
   answer: string;
   needs_human: boolean;
+  response_time_ms?: number;
 };
 
 type ConversationMessage = {
@@ -74,14 +82,11 @@ export default function Home() {
   const [conversation, setConversation] = useState<ConversationMessage[]>([]);
   const [documents, setDocuments] = useState<DocumentRecord[]>([]);
   const [loadingDocs, setLoadingDocs] = useState(false);
+  const [isSending, setIsSending] = useState(false);
   const [isPending, startTransition] = useTransition();
   const messagesRef = useRef<HTMLDivElement | null>(null);
-  const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL;
-
-  const getApiUrl = useCallback(
-    (path: string) => (apiBase ? `${apiBase}${path}` : path),
-    [apiBase]
-  );
+  const [companyId] = useState(DEFAULT_COMPANY_ID);
+  const getApiUrl = useCallback((path: string) => buildApiUrl(path), []);
 
   useEffect(() => {
     if (!messagesRef.current) return;
@@ -92,7 +97,18 @@ export default function Home() {
     const loadDocuments = async () => {
       try {
         setLoadingDocs(true);
-        const response = await fetch(getApiUrl("/api/documents"));
+        const response = await fetch(
+          getApiUrl("/api/documents"),
+          {
+            headers: buildRequestHeaders({
+              apiKey: ADMIN_API_KEY,
+              companyId,
+            }),
+          }
+        );
+        if (!response.ok) {
+          throw new Error(`Document list failed with status ${response.status}.`);
+        }
         const data: DocumentListResponse = await response.json();
         setDocuments(data.documents || []);
       } catch (error) {
@@ -103,16 +119,20 @@ export default function Home() {
     };
 
     void loadDocuments();
-  }, [getApiUrl]);
+  }, [companyId, getApiUrl]);
 
   const sendMessage = async () => {
     const currentMessage = message.trim();
-    if (!currentMessage || isPending) return;
+    if (!currentMessage || isPending || isSending) return;
 
     const userMessage: ConversationMessage = {
       role: "user",
       content: currentMessage,
     };
+    const conversationSnapshot = conversation.map((item) => ({
+      role: item.role,
+      content: item.content,
+    }));
 
     startTransition(() => {
       setConversation((prev) => [...prev, userMessage]);
@@ -120,18 +140,20 @@ export default function Home() {
     });
 
     try {
+      setIsSending(true);
       const response = await fetch(getApiUrl("/api/chat"), {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
+          ...buildRequestHeaders({
+            json: true,
+            apiKey: CHAT_API_KEY,
+            companyId,
+          }),
         },
         body: JSON.stringify({
           message: currentMessage,
-          conversation_history: conversation.map((item) => ({
-            role: item.role,
-            content: item.content,
-          })),
-          company_id: "startup-demo-001",
+          conversation_history: conversationSnapshot,
+          company_id: companyId,
         }),
       });
 
@@ -167,6 +189,8 @@ export default function Home() {
           },
         ]);
       });
+    } finally {
+      setIsSending(false);
     }
   };
 
@@ -187,7 +211,7 @@ export default function Home() {
               AI Support + Sales Copilot
             </h1>
             <p className="mt-3 text-base text-[var(--muted)]">
-              Ask questions based on your uploaded documents.
+              Ask questions based on your uploaded documents for company {companyId}.
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -266,16 +290,23 @@ export default function Home() {
               <textarea
                 value={message}
                 onChange={(event) => setMessage(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && !event.shiftKey) {
+                    event.preventDefault();
+                    void sendMessage();
+                  }
+                }}
                 placeholder="Type your question..."
+                disabled={isSending}
                 className="min-h-[92px] flex-1 rounded-[22px] border border-[var(--border)] bg-[var(--surface-strong)] px-4 py-3 text-white outline-none placeholder:text-[var(--muted)]"
               />
               <div className="flex flex-col gap-2">
                 <button
                   onClick={() => void sendMessage()}
-                  disabled={isPending}
+                  disabled={isPending || isSending}
                   className="accent-button rounded-full px-5 py-2.5 text-sm font-medium disabled:opacity-60"
                 >
-                  {isPending ? "Sending..." : "Send"}
+                  {isPending || isSending ? "Sending..." : "Send"}
                 </button>
                 <button
                   onClick={clearConversation}

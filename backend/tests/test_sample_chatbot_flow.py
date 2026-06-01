@@ -40,6 +40,7 @@ def test_sample_chatbot_flow(monkeypatch):
     chunks = _build_demo_chunks(sample_text)
     add_document_chunks(
         document_id="sample-doc",
+        company_id="demo-company",
         filename=SAMPLE_DOC_PATH.name,
         chunks=chunks,
     )
@@ -80,5 +81,59 @@ def test_sample_chatbot_flow(monkeypatch):
         "EU data residency is not included by default" in follow_up_data["answer"]
         or "EU data residency add-on" in follow_up_data["answer"]
     )
+
+    shutil.rmtree(runtime_dir, ignore_errors=True)
+
+
+def test_groq_failure_falls_back_to_extractive_answer(monkeypatch):
+    runtime_dir = Path(__file__).resolve().parent / ".tmp_sample_chatbot"
+    shutil.rmtree(runtime_dir, ignore_errors=True)
+    runtime_dir.mkdir(parents=True, exist_ok=True)
+
+    monkeypatch.setattr(vector_store, "FALLBACK_INDEX_PATH", runtime_dir / "fallback_chunks.json")
+    vector_store.get_chroma_client.cache_clear()
+    vector_store.get_embedding_function.cache_clear()
+    vector_store.get_collection.cache_clear()
+    llm_service.get_groq_client.cache_clear()
+    monkeypatch.setattr(llm_service, "GROQ_API_KEY", "demo-key")
+
+    def _disabled_collection():
+        raise RuntimeError("Semantic index disabled for deterministic tests.")
+
+    class _BrokenChatCompletions:
+        def create(self, *args, **kwargs):
+            raise RuntimeError("Groq unavailable")
+
+    class _BrokenChat:
+        completions = _BrokenChatCompletions()
+
+    class _BrokenClient:
+        chat = _BrokenChat()
+
+    monkeypatch.setattr(vector_store, "get_collection", _disabled_collection)
+    monkeypatch.setattr(llm_service, "get_groq_client", lambda: _BrokenClient())
+
+    sample_text = SAMPLE_DOC_PATH.read_text(encoding="utf-8")
+    chunks = _build_demo_chunks(sample_text)
+    add_document_chunks(
+        document_id="sample-doc",
+        company_id="demo-company",
+        filename=SAMPLE_DOC_PATH.name,
+        chunks=chunks,
+    )
+
+    response = client.post(
+        "/api/chat",
+        json={
+            "message": "Do you support Salesforce and Slack integrations?",
+            "conversation_history": [],
+            "company_id": "demo-company",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert "Salesforce" in payload["answer"] or "Slack" in payload["answer"]
+    assert "temporarily unavailable" not in payload["answer"]
 
     shutil.rmtree(runtime_dir, ignore_errors=True)
