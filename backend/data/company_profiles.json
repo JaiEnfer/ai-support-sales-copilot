@@ -12,5 +12,13 @@
     "answer_mode": "sales",
     "chatbot_title": "AI Assistant",
     "chatbot_subtitle": "Ask anything about this business."
+  },
+  {
+    "company_id": "jai",
+    "display_name": "Jai Assistance",
+    "answer_mode": "sales",
+    "chatbot_title": "AI Assistant",
+    "chatbot_subtitle": "Ask anything about this business.",
+    "company_access_key_hash": "120000$NmU4EditQ7NYjtvvbHs32w$vpxwJ2V9i2ci-1AAsYfqmRyliYC4TcQ1dsB6WJfEs5w"
   }
 ]

@@ -1,9 +1,8 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  ADMIN_API_KEY,
   buildApiUrl,
   buildRequestHeaders,
   DEFAULT_COMPANY_ID,
@@ -71,8 +70,28 @@ type CompanyProfile = {
   chatbot_subtitle: string;
 };
 
+type CompanySessionResponse = {
+  company_id: string;
+  access_token: string;
+  expires_in_seconds: number;
+  profile: CompanyProfile;
+};
+
+type StoredSession = {
+  companyId: string;
+  accessToken: string;
+  expiresAt: number;
+};
+
+const SESSION_STORAGE_KEY = "company-admin-session";
+
 export default function AdminPage() {
   const [companyId, setCompanyId] = useState(DEFAULT_COMPANY_ID);
+  const [companyAccessKey, setCompanyAccessKey] = useState("");
+  const [accessToken, setAccessToken] = useState("");
+  const [authReady, setAuthReady] = useState(false);
+  const [loginLoading, setLoginLoading] = useState(false);
+  const [authError, setAuthError] = useState("");
   const [profile, setProfile] = useState<CompanyProfile | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [websiteUrl, setWebsiteUrl] = useState("");
@@ -92,6 +111,59 @@ export default function AdminPage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const getApiUrl = useCallback((path: string) => buildApiUrl(path), []);
 
+  useEffect(() => {
+    const rawSession = window.localStorage.getItem(SESSION_STORAGE_KEY);
+    if (!rawSession) {
+      setAuthReady(true);
+      return;
+    }
+
+    try {
+      const parsed = JSON.parse(rawSession) as StoredSession;
+      if (parsed.expiresAt <= Date.now()) {
+        window.localStorage.removeItem(SESSION_STORAGE_KEY);
+      } else {
+        setCompanyId(parsed.companyId);
+        setAccessToken(parsed.accessToken);
+      }
+    } catch {
+      window.localStorage.removeItem(SESSION_STORAGE_KEY);
+    }
+
+    setAuthReady(true);
+  }, []);
+
+  const persistSession = (nextCompanyId: string, token: string, expiresInSeconds: number) => {
+    const session: StoredSession = {
+      companyId: nextCompanyId,
+      accessToken: token,
+      expiresAt: Date.now() + expiresInSeconds * 1000,
+    };
+    window.localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
+  };
+
+  const clearSession = () => {
+    window.localStorage.removeItem(SESSION_STORAGE_KEY);
+    setAccessToken("");
+    setCompanyAccessKey("");
+    setProfile(null);
+    setDocuments([]);
+    setUploadResult(null);
+    setScrapeResult(null);
+    setRetrieveResult(null);
+    setAuthError("");
+  };
+
+  const buildAdminHeaders = useCallback(
+    (options?: { json?: boolean }) =>
+      buildRequestHeaders({
+        json: options?.json,
+        companyId,
+        accessToken,
+      }),
+    [accessToken, companyId]
+  );
+
   const resetFileInput = () => {
     setFile(null);
     setFileInputKey((prev) => prev + 1);
@@ -101,13 +173,14 @@ export default function AdminPage() {
   };
 
   const loadDocuments = useCallback(async () => {
+    if (!accessToken) {
+      return;
+    }
+
     try {
       setLoadingDocs(true);
       const response = await fetch(getApiUrl("/api/documents"), {
-        headers: buildRequestHeaders({
-          apiKey: ADMIN_API_KEY,
-          companyId,
-        }),
+        headers: buildAdminHeaders(),
       });
       if (!response.ok) {
         throw new Error(`Document list failed with status ${response.status}.`);
@@ -120,19 +193,16 @@ export default function AdminPage() {
     } finally {
       setLoadingDocs(false);
     }
-  }, [companyId, getApiUrl]);
-
-  useEffect(() => {
-    void loadDocuments();
-  }, [loadDocuments]);
+  }, [accessToken, buildAdminHeaders, getApiUrl]);
 
   const loadCompanyProfile = useCallback(async () => {
+    if (!accessToken) {
+      return;
+    }
+
     try {
       const response = await fetch(getApiUrl("/api/company-profile"), {
-        headers: buildRequestHeaders({
-          apiKey: ADMIN_API_KEY,
-          companyId,
-        }),
+        headers: buildAdminHeaders(),
       });
       if (!response.ok) {
         throw new Error(`Company profile failed with status ${response.status}.`);
@@ -143,11 +213,56 @@ export default function AdminPage() {
       console.error("Failed to load company profile", error);
       setProfile(null);
     }
-  }, [companyId, getApiUrl]);
+  }, [accessToken, buildAdminHeaders, getApiUrl]);
 
   useEffect(() => {
+    if (!authReady || !accessToken) {
+      return;
+    }
+    void loadDocuments();
     void loadCompanyProfile();
-  }, [loadCompanyProfile]);
+  }, [accessToken, authReady, loadCompanyProfile, loadDocuments]);
+
+  const handleLogin = async () => {
+    if (!companyId.trim() || !companyAccessKey.trim()) {
+      setAuthError("Enter your company ID and access key.");
+      return;
+    }
+
+    try {
+      setLoginLoading(true);
+      setAuthError("");
+
+      const response = await fetch(getApiUrl("/api/company-access/login"), {
+        method: "POST",
+        headers: buildRequestHeaders({ json: true }),
+        body: JSON.stringify({
+          company_id: companyId.trim(),
+          company_access_key: companyAccessKey,
+        }),
+      });
+
+      const data: CompanySessionResponse | { detail?: string } = await response.json();
+      if (!response.ok) {
+        const errorDetail = "detail" in data ? data.detail : undefined;
+        throw new Error(errorDetail || "Sign-in failed.");
+      }
+
+      const session = data as CompanySessionResponse;
+      setCompanyId(session.company_id);
+      setAccessToken(session.access_token);
+      setProfile(session.profile);
+      persistSession(session.company_id, session.access_token, session.expires_in_seconds);
+      setCompanyAccessKey("");
+      setUploadResult(null);
+      setScrapeResult(null);
+      setRetrieveResult(null);
+    } catch (error) {
+      setAuthError(error instanceof Error ? error.message : "Sign-in failed.");
+    } finally {
+      setLoginLoading(false);
+    }
+  };
 
   const handleUpload = async () => {
     if (!file) {
@@ -164,10 +279,7 @@ export default function AdminPage() {
 
       const response = await fetch(getApiUrl("/api/documents/upload"), {
         method: "POST",
-        headers: buildRequestHeaders({
-          apiKey: ADMIN_API_KEY,
-          companyId,
-        }),
+        headers: buildAdminHeaders(),
         body: formData,
       });
 
@@ -199,13 +311,7 @@ export default function AdminPage() {
 
       const response = await fetch(getApiUrl("/api/documents/retrieve"), {
         method: "POST",
-        headers: {
-          ...buildRequestHeaders({
-            json: true,
-            apiKey: ADMIN_API_KEY,
-            companyId,
-          }),
-        },
+        headers: buildAdminHeaders({ json: true }),
         body: JSON.stringify({
           query,
           top_k: 4,
@@ -238,11 +344,7 @@ export default function AdminPage() {
 
       const response = await fetch(getApiUrl("/api/documents/scrape"), {
         method: "POST",
-        headers: buildRequestHeaders({
-          json: true,
-          apiKey: ADMIN_API_KEY,
-          companyId,
-        }),
+        headers: buildAdminHeaders({ json: true }),
         body: JSON.stringify({
           url: normalizedUrl,
           max_pages: 4,
@@ -278,10 +380,7 @@ export default function AdminPage() {
 
       const response = await fetch(getApiUrl(`/api/documents/${documentId}`), {
         method: "DELETE",
-        headers: buildRequestHeaders({
-          apiKey: ADMIN_API_KEY,
-          companyId,
-        }),
+        headers: buildAdminHeaders(),
       });
 
       const data = await response.json();
@@ -318,11 +417,7 @@ export default function AdminPage() {
       setSavingProfile(true);
       const response = await fetch(getApiUrl("/api/company-profile"), {
         method: "PUT",
-        headers: buildRequestHeaders({
-          json: true,
-          apiKey: ADMIN_API_KEY,
-          companyId,
-        }),
+        headers: buildAdminHeaders({ json: true }),
         body: JSON.stringify({
           display_name: profile.display_name,
           answer_mode: profile.answer_mode,
@@ -356,10 +451,7 @@ export default function AdminPage() {
       setClearingTenant(true);
       const response = await fetch(getApiUrl("/api/documents"), {
         method: "DELETE",
-        headers: buildRequestHeaders({
-          apiKey: ADMIN_API_KEY,
-          companyId,
-        }),
+        headers: buildAdminHeaders(),
       });
 
       const data = await response.json();
@@ -388,44 +480,102 @@ export default function AdminPage() {
     }
   };
 
+  if (!authReady) {
+    return (
+      <main className="min-h-screen px-4 py-8">
+        <div className="mx-auto max-w-xl rounded-[28px] p-6 text-white">
+          <p className="text-sm text-[var(--muted)]">Loading company portal...</p>
+        </div>
+      </main>
+    );
+  }
+
+  if (!accessToken) {
+    return (
+      <main className="min-h-screen px-4 py-8">
+        <div className="mx-auto max-w-xl space-y-6">
+          <div className="topbar flex items-center justify-between rounded-[28px] px-6 py-6">
+            <div>
+              <h1 className="text-3xl font-semibold tracking-[-0.04em] text-white">Company Portal</h1>
+              <p className="mt-1 text-sm text-[var(--muted)]">
+                Sign in to upload documents and manage your assistant.
+              </p>
+            </div>
+            <Link
+              href="/"
+              className="rounded-full border border-[var(--border-strong)] bg-[var(--surface-strong)] px-4 py-2 text-sm text-white transition hover:bg-[var(--accent-soft)]"
+            >
+              Back
+            </Link>
+          </div>
+
+          <section className="app-shell rounded-[28px] p-6 shadow-none">
+            <p className="eyebrow">Access</p>
+            <h2 className="section-title mt-2 text-xl font-semibold text-white">Company Sign-In</h2>
+            <div className="mt-4 space-y-3">
+              <input
+                type="text"
+                value={companyId}
+                onChange={(event) => setCompanyId(event.target.value)}
+                placeholder="Company ID"
+                className="w-full rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] px-4 py-2 text-white outline-none placeholder:text-[var(--muted)]"
+              />
+              <input
+                type="password"
+                value={companyAccessKey}
+                onChange={(event) => setCompanyAccessKey(event.target.value)}
+                placeholder="Company access key"
+                className="w-full rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] px-4 py-2 text-white outline-none placeholder:text-[var(--muted)]"
+              />
+              <button
+                onClick={() => void handleLogin()}
+                disabled={loginLoading}
+                className="accent-button rounded-full px-5 py-2.5 text-sm font-medium disabled:opacity-60"
+              >
+                {loginLoading ? "Signing in..." : "Sign in"}
+              </button>
+            </div>
+            <p className="mt-3 text-sm text-[var(--muted)]">
+              Ask your workspace owner for your company ID and portal access key.
+            </p>
+            {authError ? <p className="mt-3 text-sm text-[#ffb4b4]">{authError}</p> : null}
+          </section>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main className="min-h-screen px-4 py-8">
       <div className="mx-auto max-w-5xl space-y-6">
         <div className="topbar flex items-center justify-between rounded-[28px] px-6 py-6">
           <div>
-            <h1 className="text-3xl font-semibold tracking-[-0.04em] text-white">Admin</h1>
+            <h1 className="text-3xl font-semibold tracking-[-0.04em] text-white">Company Portal</h1>
             <p className="mt-1 text-sm text-[var(--muted)]">
-              Upload documents and test retrieval.
+              Upload documents and tune your assistant for {companyId}.
             </p>
           </div>
-          <Link
-            href="/"
-            className="rounded-full border border-[var(--border-strong)] bg-[var(--surface-strong)] px-4 py-2 text-sm text-white transition hover:bg-[var(--accent-soft)]"
-          >
-            Back
-          </Link>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={clearSession}
+              className="rounded-full border border-[var(--border-strong)] bg-[var(--surface-strong)] px-4 py-2 text-sm text-white transition hover:bg-[var(--accent-soft)]"
+            >
+              Sign out
+            </button>
+            <Link
+              href="/"
+              className="rounded-full border border-[var(--border-strong)] bg-[var(--surface-strong)] px-4 py-2 text-sm text-white transition hover:bg-[var(--accent-soft)]"
+            >
+              Back
+            </Link>
+          </div>
         </div>
 
         <section className="app-shell rounded-[28px] p-5 shadow-none">
-          <p className="eyebrow">Tenant</p>
+          <p className="eyebrow">Workspace</p>
           <h2 className="section-title mt-2 text-xl font-semibold text-white">Company Workspace</h2>
-          <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
-            <input
-              type="text"
-              value={companyId}
-              onChange={(event) => setCompanyId(event.target.value)}
-              placeholder="Company ID"
-              className="flex-1 rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] px-4 py-2 text-white outline-none placeholder:text-[var(--muted)]"
-            />
-            <button
-              onClick={() => void loadDocuments()}
-              className="rounded-full border border-[var(--border-strong)] bg-[var(--surface-strong)] px-5 py-2.5 text-sm text-white"
-            >
-              Load tenant
-            </button>
-          </div>
           <p className="mt-3 text-sm text-[var(--muted)]">
-            This dashboard now scopes uploads, retrieval, and deletes to one company.
+            Your session is scoped to one company, so uploads, retrieval, and deletes stay isolated.
           </p>
           <div className="mt-4">
             <button
@@ -433,7 +583,7 @@ export default function AdminPage() {
               disabled={clearingTenant}
               className="rounded-full border border-[var(--border-strong)] bg-[var(--surface-strong)] px-5 py-2.5 text-sm text-white disabled:opacity-60"
             >
-              {clearingTenant ? "Clearing..." : "Clear tenant knowledge base"}
+              {clearingTenant ? "Clearing..." : "Clear company knowledge base"}
             </button>
           </div>
         </section>
@@ -547,7 +697,7 @@ export default function AdminPage() {
 
         <section className="app-shell rounded-[28px] p-5 shadow-none">
           <p className="eyebrow">Website</p>
-          <h2 className="section-title mt-2 text-xl font-semibold text-white">Scrape Client Website</h2>
+          <h2 className="section-title mt-2 text-xl font-semibold text-white">Scrape Company Website</h2>
           <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
             <input
               type="url"
@@ -565,7 +715,7 @@ export default function AdminPage() {
             </button>
           </div>
           <p className="mt-3 text-sm text-[var(--muted)]">
-            Great for demos: index the client homepage and a few linked pages, then ask questions in chat.
+            Great for onboarding: index the homepage and a few linked pages before refining with PDFs.
           </p>
 
           {scrapeResult && (

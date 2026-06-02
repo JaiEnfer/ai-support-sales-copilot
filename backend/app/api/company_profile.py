@@ -2,14 +2,14 @@
 
 from fastapi import APIRouter, Depends
 
-from backend.app.api.dependencies import require_admin_api_key, resolve_company_id
+from backend.app.api.dependencies import require_company_admin_access, resolve_company_id
 from backend.app.models.schemas import CompanyProfile, CompanyProfileUpdateRequest
 from backend.app.services.company_profile_service import get_company_profile, upsert_company_profile
 
 router = APIRouter(
     prefix="/api/company-profile",
     tags=["company-profile"],
-    dependencies=[Depends(require_admin_api_key)],
+    dependencies=[Depends(require_company_admin_access)],
 )
 
 

@@ -115,6 +115,27 @@ class CompanyProfileUpdateRequest(BaseModel):
     chatbot_subtitle: Optional[str] = None
 
 
+class CompanyAdminLoginRequest(BaseModel):
+    company_id: str = Field(..., min_length=1, examples=["acme-dental"])
+    company_access_key: str = Field(..., min_length=8, examples=["acme-super-secret-key"])
+
+
+class CompanyAdminSessionResponse(BaseModel):
+    company_id: str
+    access_token: str
+    expires_in_seconds: int
+    profile: CompanyProfile
+
+
+class CompanyAdminProvisionRequest(BaseModel):
+    company_id: str = Field(..., min_length=1, examples=["acme-dental"])
+    company_access_key: str = Field(..., min_length=8, examples=["acme-super-secret-key"])
+    display_name: Optional[str] = None
+    answer_mode: Optional[str] = Field(default=None, pattern="^(sales|support|portfolio)$")
+    chatbot_title: Optional[str] = None
+    chatbot_subtitle: Optional[str] = None
+
+
 class HealthResponse(BaseModel):
     status: str
     environment: str

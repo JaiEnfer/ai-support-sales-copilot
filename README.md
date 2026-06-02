@@ -105,6 +105,7 @@ DEFAULT_COMPANY_ID=startup-demo-001
 DEFAULT_ANSWER_MODE=sales
 ADMIN_API_KEY=change-me-admin-key
 CHAT_API_KEY=
+COMPANY_ADMIN_TOKEN_SECRET=change-me-company-session-secret
 REQUIRE_COMPANY_ID=true
 MAX_CHAT_HISTORY_MESSAGES=12
 MAX_CHAT_MESSAGE_LENGTH=4000
@@ -139,7 +140,7 @@ npm run dev
 
 Open `http://localhost:3000` for the UI and `http://localhost:8000/docs` for the backend API docs.
 
-Create `frontend/.env.local` from `frontend/.env.example` if you want the frontend to send tenant and API-key headers automatically during local development.
+Create `frontend/.env.local` from `frontend/.env.example` for local frontend configuration. The company portal now signs in with a company-specific access key instead of exposing the master admin key in the browser.
 
 ## Docker
 
@@ -161,7 +162,7 @@ This project supports a basic white-label model:
 
 - each company uses a unique `company_id`
 - uploads, retrieval, and chat responses are scoped to that company
-- the admin dashboard can be pointed at a specific tenant/company workspace
+- the company portal can be pointed at a specific tenant/company workspace
 - the website widget can be embedded on any client site and tied to that company
 - the admin dashboard can scrape a client website and index a few same-domain pages for demos
 - scraped websites generate a structured summary layer before raw page text is indexed, improving demo answer quality
@@ -170,9 +171,10 @@ This project supports a basic white-label model:
 ### Tenant Onboarding
 
 1. Pick a `company_id` such as `acme-dental`.
-2. Open the admin dashboard and set that company ID.
-3. Upload that company's PDFs and knowledge files.
-4. Embed the widget script on that company's website.
+2. Provision a company portal access key with the master admin credential.
+3. Share that `company_id` and access key with the client.
+4. The client signs into `/admin` and uploads that company's PDFs and knowledge files.
+5. Embed the widget script on that company's website.
 
 For faster demos, you can also paste a client website URL into the admin dashboard and let the app ingest the homepage plus a few linked pages.
 
@@ -193,13 +195,52 @@ Serve the frontend publicly, then place this on a client website:
 
 The script injects a floating chat button and loads an iframe-backed assistant from `/embed`.
 
-### Admin Tenant Workflow
+### Company Portal Workflow
 
-- use `X-Company-ID` or the admin page tenant field to scope uploads
-- use `ADMIN_API_KEY` to protect document-management endpoints
+- use `ADMIN_API_KEY` only for operator provisioning or key rotation
+- use `/api/company-access/login` to exchange a company ID and company access key for a scoped bearer token
+- use the `/admin` company portal to upload PDFs, scrape websites, and update branding without exposing the master admin key
 - use `CHAT_API_KEY` if you want the embeddable widget to call chat through a shared key
 
 For real production deployments, replace shared chat keys with a gateway or token-based auth layer.
+
+### Provision A Company Portal Key
+
+Use the master admin key once to create or rotate a company portal key:
+
+```bash
+curl -X PUT https://your-backend-domain.com/api/company-access \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your-master-admin-key" \
+  -d '{
+    "company_id": "acme-dental",
+    "company_access_key": "choose-a-long-random-company-key",
+    "display_name": "Acme Dental",
+    "answer_mode": "support",
+    "chatbot_title": "Acme Dental Assistant",
+    "chatbot_subtitle": "Ask about services, bookings, pricing, or insurance."
+  }'
+```
+
+If you prefer a simpler command instead of `curl`, use the provisioning helper:
+
+```bash
+.venv\Scripts\python.exe backend/scripts/provision_company_access.py ^
+  --api-base-url https://your-backend-domain.com ^
+  --admin-api-key your-master-admin-key ^
+  --company-id acme-dental ^
+  --display-name "Acme Dental" ^
+  --answer-mode support ^
+  --chatbot-title "Acme Dental Assistant" ^
+  --chatbot-subtitle "Ask about services, bookings, pricing, or insurance."
+```
+
+If you omit `--company-access-key`, the script generates a secure one and prints it for you.
+
+After that, the client can sign into `https://your-frontend-domain.com/admin` with:
+
+- `company_id`: `acme-dental`
+- access key: the `company_access_key` you provisioned for that company
 
 ## Sample Document And Human-Style Demo
 

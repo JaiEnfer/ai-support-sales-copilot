@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, Request
 
 from backend.app.api.dependencies import (
     get_request_id,
-    require_admin_api_key,
+    require_company_admin_access,
     resolve_company_id,
 )
 from backend.app.core.config import UPLOAD_DIR, settings
@@ -40,7 +40,7 @@ from backend.app.services.website_ingestion import build_website_summary, scrape
 router = APIRouter(
     prefix="/api/documents",
     tags=["documents"],
-    dependencies=[Depends(require_admin_api_key)],
+    dependencies=[Depends(require_company_admin_access)],
 )
 
 SAFE_FILENAME_PATTERN = re.compile(r"[^A-Za-z0-9._-]+")

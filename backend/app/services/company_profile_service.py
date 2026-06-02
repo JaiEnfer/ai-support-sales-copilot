@@ -9,6 +9,7 @@ from typing import Any
 
 from backend.app.core.config import DATA_DIR, settings
 from backend.app.models.schemas import CompanyProfile
+from backend.app.services.company_admin_auth import hash_company_access_key
 
 COMPANY_PROFILE_PATH = DATA_DIR / "company_profiles.json"
 
@@ -54,6 +55,14 @@ def get_company_profile(company_id: str) -> CompanyProfile:
     )
 
 
+def get_company_profile_record(company_id: str) -> dict[str, Any] | None:
+    """Return the raw stored profile record for auth and provisioning flows."""
+    for profile in _read_profiles():
+        if profile.get("company_id") == company_id:
+            return profile
+    return None
+
+
 def upsert_company_profile(company_id: str, updates: dict[str, Any]) -> CompanyProfile:
     """Create or update a company profile in the local JSON store."""
     current_profile = get_company_profile(company_id)
@@ -64,5 +73,28 @@ def upsert_company_profile(company_id: str, updates: dict[str, Any]) -> CompanyP
     profiles = _read_profiles()
     remaining = [profile for profile in profiles if profile.get("company_id") != company_id]
     remaining.append(updated_profile.model_dump())
+    _save_profiles(remaining)
+    return updated_profile
+
+
+def set_company_access_key(
+    company_id: str,
+    company_access_key: str,
+    updates: dict[str, Any] | None = None,
+) -> CompanyProfile:
+    """Provision or rotate the company access key alongside optional profile fields."""
+    sanitized_updates = dict(updates or {})
+    sanitized_updates["company_access_key_hash"] = hash_company_access_key(company_access_key)
+
+    current_profile = get_company_profile(company_id)
+    updated_profile = current_profile.model_copy(
+        update={key: value for key, value in sanitized_updates.items() if value is not None}
+    )
+
+    profiles = _read_profiles()
+    remaining = [profile for profile in profiles if profile.get("company_id") != company_id]
+    raw_record = updated_profile.model_dump()
+    raw_record["company_access_key_hash"] = sanitized_updates["company_access_key_hash"]
+    remaining.append(raw_record)
     _save_profiles(remaining)
     return updated_profile

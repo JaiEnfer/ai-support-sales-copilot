@@ -10,6 +10,7 @@ from fastapi.responses import JSONResponse
 from backend.app.api.dependencies import REQUEST_ID_HEADER, assign_request_id
 from backend.app.api.health import router as health_router
 from backend.app.api.chat import router as chat_router
+from backend.app.api.company_access import router as company_access_router
 from backend.app.api.company_profile import router as company_profile_router
 from backend.app.api.documents import router as documents_router
 from backend.app.core.config import settings
@@ -67,6 +68,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
 
 app.include_router(health_router)
 app.include_router(chat_router)
+app.include_router(company_access_router)
 app.include_router(company_profile_router)
 app.include_router(documents_router)
 

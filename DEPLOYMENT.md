@@ -24,6 +24,7 @@ This repo includes `render.yaml`, so you can create the API service from the Ren
    - `GROQ_API_KEY`
    - `ADMIN_API_KEY`
    - `CHAT_API_KEY`
+   - `COMPANY_ADMIN_TOKEN_SECRET`
 5. Set host and CORS values for your real domains:
    - `TRUSTED_HOSTS=["your-backend-domain.onrender.com"]`
    - `ALLOWED_ORIGINS=["https://your-frontend-domain.vercel.app"]`
@@ -43,7 +44,6 @@ This repo includes `frontend/vercel.json` for a straightforward Next.js deployme
 ```env
 NEXT_PUBLIC_API_BASE_URL=https://your-backend-domain.onrender.com
 NEXT_PUBLIC_DEFAULT_COMPANY_ID=startup-demo-001
-NEXT_PUBLIC_ADMIN_API_KEY=your-admin-key
 NEXT_PUBLIC_CHAT_API_KEY=your-chat-key
 NEXT_PUBLIC_SHOW_ADMIN_LINK=false
 ```
@@ -70,6 +70,48 @@ After both services are live:
    - `https://your-frontend-domain.vercel.app/admin`
    - `https://your-backend-domain.onrender.com/api/health`
 
+## Provision Company Access
+
+Use the master admin key once per client to create their company portal access:
+
+```bash
+curl -X PUT https://your-backend-domain.onrender.com/api/company-access \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your-admin-key" \
+  -d '{
+    "company_id": "acme-dental",
+    "company_access_key": "choose-a-long-random-company-key",
+    "display_name": "Acme Dental",
+    "answer_mode": "support",
+    "chatbot_title": "Acme Dental Assistant",
+    "chatbot_subtitle": "Ask us about services, bookings, pricing, or insurance."
+  }'
+```
+
+Or use the helper script from your repo checkout:
+
+```bash
+.venv\Scripts\python.exe backend/scripts/provision_company_access.py ^
+  --api-base-url https://your-backend-domain.onrender.com ^
+  --admin-api-key your-admin-key ^
+  --company-id acme-dental ^
+  --display-name "Acme Dental" ^
+  --answer-mode support ^
+  --chatbot-title "Acme Dental Assistant" ^
+  --chatbot-subtitle "Ask us about services, bookings, pricing, or insurance."
+```
+
+If you do not pass `--company-access-key`, the helper generates one and prints it so you can share it with the client.
+
+Then the client can sign into:
+
+- `https://your-frontend-domain.vercel.app/admin`
+
+with:
+
+- company ID: `acme-dental`
+- access key: the `company_access_key` you set for that company
+
 ## Client Website Embed
 
 Once the frontend is public, give the client this snippet:
@@ -90,8 +132,9 @@ The client only needs script-tag access to their website. This works well on Wor
 ## Production Checklist
 
 - Use a unique `company_id` for each client.
+- Use a long random company access key for each client and rotate it if it is shared too broadly.
 - Clear old tenant data before reusing a demo workspace.
-- Keep `ADMIN_API_KEY` and `CHAT_API_KEY` aligned between frontend and backend.
+- Keep `ADMIN_API_KEY`, `CHAT_API_KEY`, and `COMPANY_ADMIN_TOKEN_SECRET` set only on the backend.
 - Rotate any API key that was ever committed or shared.
 - Re-scrape or re-upload client content after major retrieval changes.
 - Plan to replace shared chat keys with signed widget tokens or gateway auth as the next security upgrade.

@@ -3,8 +3,10 @@ from io import BytesIO
 from fastapi.testclient import TestClient
 
 from backend.app.api import company_profile as company_profile_api
+from backend.app.api import company_access as company_access_api
 from backend.app.api import documents as documents_api
 from backend.app.services import chat_service
+from backend.app.services.company_admin_auth import create_company_admin_token, hash_company_access_key
 from backend.app.core.config import settings
 from backend.app.main import app
 from backend.app.models.schemas import CompanyProfile
@@ -98,7 +100,7 @@ def test_documents_require_api_key_when_configured(monkeypatch):
 
     response = client.get("/api/documents")
     assert response.status_code == 401
-    assert response.json()["detail"] == "Invalid or missing API key."
+    assert response.json()["detail"] == "Invalid or missing company admin credentials."
 
     authorized_response = client.get(
         "/api/documents",
@@ -128,6 +130,65 @@ def test_chat_requires_api_key_when_configured(monkeypatch):
     assert authorized_response.json()["company_id"] == "tenant-1"
 
     monkeypatch.setattr(settings, "chat_api_key", None)
+
+
+def test_company_admin_login_returns_scoped_session(monkeypatch):
+    monkeypatch.setattr(settings, "company_admin_token_secret", "token-secret")
+    monkeypatch.setattr(
+        company_access_api,
+        "get_company_profile_record",
+        lambda company_id: {
+            "company_id": company_id,
+            "company_access_key_hash": hash_company_access_key("tenant-secret-key"),
+        },
+    )
+    monkeypatch.setattr(
+        company_access_api,
+        "get_company_profile",
+        lambda company_id: CompanyProfile(
+            company_id=company_id,
+            display_name="Tenant Portal",
+            answer_mode="support",
+            chatbot_title="Tenant Assistant",
+            chatbot_subtitle="Ask for help.",
+        ),
+    )
+
+    response = client.post(
+        "/api/company-access/login",
+        json={"company_id": "tenant-login", "company_access_key": "tenant-secret-key"},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["company_id"] == "tenant-login"
+    assert payload["access_token"]
+    assert payload["profile"]["display_name"] == "Tenant Portal"
+
+
+def test_company_bearer_token_is_scoped_to_matching_company(monkeypatch):
+    monkeypatch.setattr(settings, "admin_api_key", None)
+    monkeypatch.setattr(settings, "company_admin_token_secret", "token-secret")
+    scoped_token = create_company_admin_token("tenant-portal")
+    monkeypatch.setattr(documents_api, "load_documents", lambda: [])
+
+    authorized_response = client.get(
+        "/api/documents",
+        headers={
+            "Authorization": f"Bearer {scoped_token}",
+            "X-Company-ID": "tenant-portal",
+        },
+    )
+    assert authorized_response.status_code == 200
+
+    wrong_company_response = client.get(
+        "/api/documents",
+        headers={
+            "Authorization": f"Bearer {scoped_token}",
+            "X-Company-ID": "another-tenant",
+        },
+    )
+    assert wrong_company_response.status_code == 401
 
 
 def test_document_list_is_scoped_to_company_header(monkeypatch):

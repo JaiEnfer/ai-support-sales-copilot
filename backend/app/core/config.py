@@ -28,6 +28,8 @@ class Settings(BaseSettings):
     default_answer_mode: str = "sales"
     admin_api_key: str | None = None
     chat_api_key: str | None = None
+    company_admin_token_secret: str | None = None
+    company_admin_session_hours: int = 12
     require_company_id: bool = True
     max_chat_history_messages: int = 12
     max_chat_message_length: int = 4000
